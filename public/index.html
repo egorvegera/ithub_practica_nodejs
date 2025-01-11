@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #downloadProgress {
+            margin-top: 10px;
+        }
+        #downloadedFiles {
+            margin-top: 20px;
+            display: none;
+        }
+        .file-item {
+            margin: 5px 0;
+        }
+        #errorMessage {
+            color: red;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>HTTP Client</h1>
+    <label for="keyword">Введите ключевое слово: </label>
+    <input type="text" id="keyword" placeholder="nodejs, javascript">
+    <button id="getUrlsButton">Получить URL</button>
+
+    <div id="urlsList"></div>
+    <div id="errorMessage"></div>
+
+    <div id="downloadProgress"></div>
+
+    <div id="downloadedFiles">
+        <h2>Загруженные файлы:</h2>
+        <ul id="downloadedFilesList"></ul>
+    </div>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:3000');
+
+        socket.onopen = () => {
+            console.log('Connected to the WebSocket server');
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.action === 'sendURLs') {
+                showURLs(data.urls);
+            }
+
+            if (data.action === 'downloadProgress') {
+                updateProgress(data);
+            }
+
+            if (data.action === 'downloadComplete') {
+                alert('Download Complete! File saved at: ' + data.filePath);
+                document.getElementById('downloadProgress').textContent = 'Загрузка завершена!';
+                addDownloadedFile(data.filePath); 
+                showDownloadedFilesSection(); 
+            }
+
+            if (data.action === 'error') {
+                document.getElementById('errorMessage').textContent = data.message;
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        };
+
+        function getURLs() {
+            const keyword = document.getElementById('keyword').value;
+            socket.send(JSON.stringify({ action: 'getURLs', keyword }));
+        }
+
+        function showURLs(urls) {
+            const urlsList = document.getElementById('urlsList');
+            urlsList.innerHTML = '';
+            urls.forEach(url => {
+                const button = document.createElement('button');
+                button.textContent = url;
+                button.onclick = () => downloadContent(url);
+                urlsList.appendChild(button);
+            });
+        }
+
+        function downloadContent(url) {
+            socket.send(JSON.stringify({ action: 'downloadContent', url }));
+            document.getElementById('downloadProgress').textContent = 'Загрузка...';
+        }
+
+        function updateProgress(data) {
+            const progressText = `Progress: ${data.progress}% of ${data.totalSize} (Threads: ${data.currentThreadCount})`;
+            document.getElementById('downloadProgress').textContent = progressText;
+        }
+
+        // Функция для добавления загруженного файла в список
+        function addDownloadedFile(filePath) {
+            const fileList = document.getElementById('downloadedFilesList');
+            const listItem = document.createElement('li');
+            listItem.textContent = filePath;
+            listItem.classList.add('file-item');
+            fileList.appendChild(listItem);
+        }
+
+        // Функция для отображения раздела с загруженными файлами
+        function showDownloadedFilesSection() {
+            const downloadedFilesSection = document.getElementById('downloadedFiles');
+            downloadedFilesSection.style.display = 'block'; // Показываем раздел
+        }
+
+        // Добавляем обработчик на кнопку для получения URL
+        document.getElementById('getUrlsButton').addEventListener('click', getURLs);
+
+        // Добавляем обработчик на клавишу Enter в поле ввода
+        document.getElementById('keyword').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                getURLs();
+            }
+        });
+    </script>
+</body>
+</html>
